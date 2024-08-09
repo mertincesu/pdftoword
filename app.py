@@ -54,7 +54,7 @@ uploaded_pdf = st.file_uploader("Upload your PDF file", type="pdf")
 output_format = st.selectbox("Select output format", ["Word Document", "Text File"])
 
 if uploaded_pdf:
-    if output_format == "Word Document (Preserves Tables)":
+    if output_format == "Word Document":
         st.write("Converting PDF to Word document...")
         # Read the uploaded PDF file as bytes
         pdf_bytes = uploaded_pdf.read()
@@ -72,7 +72,7 @@ if uploaded_pdf:
             )
         except Exception as e:
             st.error(f"An error occurred during conversion: {e}")
-    else:
+    elif output_format == "Text File":
         st.write("Extracting text from PDF...")
         # Convert PDF to text
         try:
