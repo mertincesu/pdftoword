@@ -1,7 +1,8 @@
 import streamlit as st
 import fitz  # PyMuPDF
-from docx import Document
+from pdf2docx import Converter
 from io import BytesIO
+import tempfile
 
 def pdf_to_text(pdf_file):
     # Open the PDF file
@@ -15,19 +16,26 @@ def pdf_to_text(pdf_file):
 
     return text
 
-def text_to_word(text):
-    # Create a Word document
-    doc = Document()
-    # Add text to the document
-    for paragraph in text.split('\n'):
-        doc.add_paragraph(paragraph)
+def pdf_to_word(pdf_bytes):
+    # Save the PDF bytes to a temporary file
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_pdf:
+        temp_pdf.write(pdf_bytes)
+        temp_pdf_path = temp_pdf.name
     
-    # Save the document to a BytesIO object
-    word_file = BytesIO()
-    doc.save(word_file)
-    word_file.seek(0)
+    # Prepare a BytesIO object to receive the Word data
+    docx_file = BytesIO()
     
-    return word_file
+    # Use pdf2docx to convert PDF to DOCX
+    cv = Converter(temp_pdf_path)
+    cv.convert(docx_file)  # convert_method accepts file streams
+    cv.close()
+    
+    docx_file.seek(0)
+    
+    # Clean up the temporary PDF file
+    temp_pdf.close()
+
+    return docx_file
 
 def text_to_txt(text):
     # Create a text file in a BytesIO object
@@ -37,41 +45,52 @@ def text_to_txt(text):
     
     return txt_file
 
-st.title("PDF to Word or TXT Converter")
+st.title("PDF to Word or TXT Converter with Table Preservation")
 
 # Upload PDF
 uploaded_pdf = st.file_uploader("Upload your PDF file", type="pdf")
 
 # Selection for output format
-output_format = st.selectbox("Select output format", ["Word Document", "Text File"])
+output_format = st.selectbox("Select output format", ["Word Document (Preserves Tables)", "Text File"])
 
 if uploaded_pdf:
-    # Convert PDF to text
-    st.write("Converting PDF to text...")
-    extracted_text = pdf_to_text(uploaded_pdf)
-    st.write("Text extraction completed.")
-
-    if output_format == "Word Document":
-        # Convert text to Word
-        st.write("Converting text to Word document...")
-        file = text_to_word(extracted_text)
-        file_extension = "docx"
-        mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        file_name = "converted_document.docx"
+    if output_format == "Word Document (Preserves Tables)":
+        st.write("Converting PDF to Word document with table preservation...")
+        # Read the uploaded PDF file as bytes
+        pdf_bytes = uploaded_pdf.read()
+        # Convert PDF to Word
+        try:
+            word_file = pdf_to_word(pdf_bytes)
+            st.write("Conversion to Word document completed.")
+            
+            # Provide download button for the Word file
+            st.download_button(
+                label="Download Word Document",
+                data=word_file,
+                file_name="converted_document.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        except Exception as e:
+            st.error(f"An error occurred during conversion: {e}")
     else:
-        # Convert text to TXT
-        st.write("Converting text to TXT file...")
-        file = text_to_txt(extracted_text)
-        file_extension = "txt"
-        mime_type = "text/plain"
-        file_name = "converted_document.txt"
-
-    st.write(f"Conversion to {output_format} completed.")
-
-    # Provide download button for the file
-    st.download_button(
-        label=f"Download {output_format}",
-        data=file,
-        file_name=file_name,
-        mime=mime_type
-    )
+        st.write("Extracting text from PDF...")
+        # Convert PDF to text
+        try:
+            # Since we've read the PDF bytes for the word conversion, we need to reinitialize the BytesIO object
+            uploaded_pdf.seek(0)
+            extracted_text = pdf_to_text(uploaded_pdf)
+            st.write("Text extraction completed.")
+            
+            # Convert text to TXT
+            txt_file = text_to_txt(extracted_text)
+            st.write("Conversion to TXT file completed.")
+            
+            # Provide download button for the TXT file
+            st.download_button(
+                label="Download Text File",
+                data=txt_file,
+                file_name="extracted_text.txt",
+                mime="text/plain"
+            )
+        except Exception as e:
+            st.error(f"An error occurred during text extraction: {e}")
