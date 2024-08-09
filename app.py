@@ -45,17 +45,17 @@ def text_to_txt(text):
     
     return txt_file
 
-st.title("PDF to Word or TXT Converter with Table Preservation")
+st.title("PDF to Word or TXT Converter")
 
 # Upload PDF
 uploaded_pdf = st.file_uploader("Upload your PDF file", type="pdf")
 
 # Selection for output format
-output_format = st.selectbox("Select output format", ["Word Document (Preserves Tables)", "Text File"])
+output_format = st.selectbox("Select output format", ["Word Document", "Text File"])
 
 if uploaded_pdf:
     if output_format == "Word Document (Preserves Tables)":
-        st.write("Converting PDF to Word document with table preservation...")
+        st.write("Converting PDF to Word document...")
         # Read the uploaded PDF file as bytes
         pdf_bytes = uploaded_pdf.read()
         # Convert PDF to Word
