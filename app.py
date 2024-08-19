@@ -3,6 +3,9 @@ import fitz  # PyMuPDF
 from pdf2docx import Converter
 from io import BytesIO
 import tempfile
+from docx import Document
+from PIL import Image
+from io import BytesIO as PILBytesIO
 
 def pdf_to_text(pdf_file):
     # Open the PDF file
@@ -15,6 +18,41 @@ def pdf_to_text(pdf_file):
         text += page.get_text()  # Extract text from the page
 
     return text
+
+def compress_image(image):
+    # Convert RGBA to RGB if the image has an alpha channel
+    if image.mode == 'RGBA':
+        image = image.convert('RGB')
+    
+    # Compress the image to reduce the file size
+    with PILBytesIO() as output:
+        image.save(output, format="JPEG", quality=50)  # Adjust quality as needed
+        compressed_image = output.getvalue()
+    return compressed_image
+
+def optimize_images_in_docx(docx_file):
+    # Open the DOCX file
+    doc = Document(docx_file)
+    
+    # Debug: Check the number of images in the DOCX
+    image_count = 0
+    
+    # Iterate through all the images in the document and compress them
+    for rel in doc.part.rels.values():
+        if "image" in rel.target_ref:
+            image_count += 1
+            image = Image.open(BytesIO(rel.target_part.blob))
+            compressed_image = compress_image(image)
+            rel.target_part._blob = compressed_image  # Replace the image with the compressed version
+    
+    # Debug: Output the number of images found and processed
+    print(f"Number of images processed: {image_count}")
+    
+    # Save the optimized DOCX back to a BytesIO object
+    optimized_docx = BytesIO()
+    doc.save(optimized_docx)
+    optimized_docx.seek(0)
+    return optimized_docx
 
 def pdf_to_word(pdf_bytes):
     # Save the PDF bytes to a temporary file
@@ -32,10 +70,10 @@ def pdf_to_word(pdf_bytes):
     
     docx_file.seek(0)
     
-    # Clean up the temporary PDF file
-    temp_pdf.close()
-
-    return docx_file
+    # Optimize images in the DOCX file
+    optimized_docx = optimize_images_in_docx(docx_file)
+    
+    return optimized_docx
 
 def text_to_txt(text):
     # Create a text file in a BytesIO object
@@ -58,6 +96,7 @@ if uploaded_pdf:
         st.write("Converting PDF to Word document...")
         # Read the uploaded PDF file as bytes
         pdf_bytes = uploaded_pdf.read()
+
         # Convert PDF to Word
         try:
             word_file = pdf_to_word(pdf_bytes)
@@ -72,8 +111,10 @@ if uploaded_pdf:
             )
         except Exception as e:
             st.error(f"An error occurred during conversion: {e}")
+            print(f"Error details: {e}")
     elif output_format == "Text File":
         st.write("Extracting text from PDF...")
+
         # Convert PDF to text
         try:
             # Since we've read the PDF bytes for the word conversion, we need to reinitialize the BytesIO object
@@ -94,3 +135,4 @@ if uploaded_pdf:
             )
         except Exception as e:
             st.error(f"An error occurred during text extraction: {e}")
+            print(f"Error details: {e}")
