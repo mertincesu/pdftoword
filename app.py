@@ -14,6 +14,11 @@ def pdf_to_text(pdf_file):
     text = ""
     # Iterate through the pages
     for page_num in range(doc.page_count):
+        # Check if the file is still uploaded
+        if not st.session_state.uploaded_pdf:
+            st.warning("File upload was canceled. Stopping conversion.")
+            return None
+        
         page = doc.load_page(page_num)  # Load each page
         text += page.get_text()  # Extract text from the page
 
@@ -85,30 +90,41 @@ def text_to_txt(text):
 
 st.title("PDF to Word or TXT Converter")
 
+# Session state to track uploaded file
+if 'uploaded_pdf' not in st.session_state:
+    st.session_state.uploaded_pdf = None
+
 # Upload PDF
 uploaded_pdf = st.file_uploader("Upload your PDF file", type="pdf")
+
+# If a file is uploaded, save it to session state
+if uploaded_pdf:
+    st.session_state.uploaded_pdf = uploaded_pdf
+else:
+    st.session_state.uploaded_pdf = None
 
 # Selection for output format
 output_format = st.selectbox("Select output format", ["Word Document", "Text File"])
 
-if uploaded_pdf:
+if st.session_state.uploaded_pdf:
     if output_format == "Word Document":
         st.write("Converting PDF to Word document...")
         # Read the uploaded PDF file as bytes
-        pdf_bytes = uploaded_pdf.read()
+        pdf_bytes = st.session_state.uploaded_pdf.read()
 
         # Convert PDF to Word
         try:
             word_file = pdf_to_word(pdf_bytes)
-            st.write("Conversion to Word document completed.")
-            
-            # Provide download button for the Word file
-            st.download_button(
-                label="Download Word Document",
-                data=word_file,
-                file_name="converted_document.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+            if word_file:
+                st.write("Conversion to Word document completed.")
+                
+                # Provide download button for the Word file
+                st.download_button(
+                    label="Download Word Document",
+                    data=word_file,
+                    file_name="converted_document.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
         except Exception as e:
             st.error(f"An error occurred during conversion: {e}")
             print(f"Error details: {e}")
@@ -118,21 +134,22 @@ if uploaded_pdf:
         # Convert PDF to text
         try:
             # Since we've read the PDF bytes for the word conversion, we need to reinitialize the BytesIO object
-            uploaded_pdf.seek(0)
-            extracted_text = pdf_to_text(uploaded_pdf)
-            st.write("Text extraction completed.")
-            
-            # Convert text to TXT
-            txt_file = text_to_txt(extracted_text)
-            st.write("Conversion to TXT file completed.")
-            
-            # Provide download button for the TXT file
-            st.download_button(
-                label="Download Text File",
-                data=txt_file,
-                file_name="extracted_text.txt",
-                mime="text/plain"
-            )
+            st.session_state.uploaded_pdf.seek(0)
+            extracted_text = pdf_to_text(st.session_state.uploaded_pdf)
+            if extracted_text:
+                st.write("Text extraction completed.")
+                
+                # Convert text to TXT
+                txt_file = text_to_txt(extracted_text)
+                st.write("Conversion to TXT file completed.")
+                
+                # Provide download button for the TXT file
+                st.download_button(
+                    label="Download Text File",
+                    data=txt_file,
+                    file_name="extracted_text.txt",
+                    mime="text/plain"
+                )
         except Exception as e:
             st.error(f"An error occurred during text extraction: {e}")
             print(f"Error details: {e}")
