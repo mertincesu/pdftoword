@@ -15,7 +15,7 @@ def pdf_to_text(pdf_file):
     # Iterate through the pages
     for page_num in range(doc.page_count):
         # Check if the file is still uploaded
-        if not st.session_state.uploaded_pdf:
+        if st.session_state.uploaded_pdf is None:
             st.warning("File upload was canceled. Stopping conversion.")
             return None
         
