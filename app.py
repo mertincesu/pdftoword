@@ -1,11 +1,11 @@
 import streamlit as st
-import fitz  # PyMuPDF
 from pdf2docx import Converter
 from io import BytesIO
 import tempfile
 from docx import Document
 from PIL import Image
 from io import BytesIO as PILBytesIO
+import fitz  # PyMuPDF
 
 def pdf_to_text(pdf_file):
     doc = fitz.open(stream=pdf_file, filetype="pdf")
@@ -38,15 +38,24 @@ def optimize_images_in_docx(docx_file):
     return optimized_docx
 
 def pdf_to_word(pdf_bytes):
+    # Save the PDF bytes to a temporary file
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_pdf:
         temp_pdf.write(pdf_bytes)
         temp_pdf_path = temp_pdf.name
+    
+    # Prepare a BytesIO object to receive the Word data
     docx_file = BytesIO()
+    
+    # Use pdf2docx to convert PDF to DOCX
     cv = Converter(temp_pdf_path)
     cv.convert(docx_file)
     cv.close()
+    
     docx_file.seek(0)
+    
+    # Optimize images in the DOCX file
     optimized_docx = optimize_images_in_docx(docx_file)
+    
     return optimized_docx
 
 def text_to_txt(text):
@@ -55,7 +64,7 @@ def text_to_txt(text):
     txt_file.seek(0)
     return txt_file
 
-st.title("PDF to Word or TXT Converter")
+st.title("PDF Converter: Word, Text, and More")
 
 # Session state to track uploaded file and conversion status
 if 'uploaded_pdf' not in st.session_state:
@@ -73,37 +82,54 @@ if uploaded_pdf:
 else:
     st.session_state.uploaded_pdf = None
 
+# Select output format (visible when the app starts)
+output_format = st.selectbox("Select output format", ["Word Document", "Text File", "Extracted Text"])
+
+# Initialize empty variables for holding file data
+download_data = None
+download_label = ""
+download_mime = ""
+
 # Start conversion button
 if st.button("Start Conversion"):
     if st.session_state.uploaded_pdf is None:
         st.error("No file uploaded. Please upload a PDF file first.")
     elif not st.session_state.conversion_done:
-        output_format = st.selectbox("Select output format", ["Word Document", "Text File"])
         try:
             if output_format == "Word Document":
                 st.write("Converting PDF to Word document...")
                 word_file = pdf_to_word(st.session_state.uploaded_pdf)
-                st.write("Conversion to Word document completed.")
-                st.download_button(
-                    label="Download Word Document",
-                    data=word_file,
-                    file_name="converted_document.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+                download_data = word_file
+                download_label = "Download Word Document"
+                download_mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                download_filename = "converted_document.docx"
+
             elif output_format == "Text File":
                 st.write("Extracting text from PDF...")
                 extracted_text = pdf_to_text(BytesIO(st.session_state.uploaded_pdf))
-                st.write("Text extraction completed.")
                 txt_file = text_to_txt(extracted_text)
-                st.download_button(
-                    label="Download Text File",
-                    data=txt_file,
-                    file_name="extracted_text.txt",
-                    mime="text/plain"
-                )
+                download_data = txt_file
+                download_label = "Download Text File"
+                download_mime = "text/plain"
+                download_filename = "extracted_text.txt"
+
+            elif output_format == "Extracted Text":
+                st.write("Extracting text from PDF...")
+                extracted_text = pdf_to_text(BytesIO(st.session_state.uploaded_pdf))
+                st.text_area("Extracted Text", value=extracted_text, height=300)
+
             st.session_state.conversion_done = True  # Mark conversion as done
         except Exception as e:
             st.error(f"An error occurred during conversion: {e}")
             print(f"Error details: {e}")
     else:
         st.warning("File already converted. Please upload a new file or press the button again to reconvert.")
+
+# Show download button if data is ready
+if download_data:
+    st.download_button(
+        label=download_label,
+        data=download_data,
+        file_name=download_filename,
+        mime=download_mime
+    )
